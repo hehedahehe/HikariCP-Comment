@@ -61,15 +61,16 @@ public class SuspendResumeLock
       acquisitionSemaphore = (createSemaphore ? new Semaphore(MAX_PERMITS, true) : null);
    }
 
-   public void acquire() throws SQLException
-   {
+   public void acquire() throws SQLException{
+      //1. 如果获取成功 则直接返回
       if (acquisitionSemaphore.tryAcquire()) {
          return;
       }
+      //2. 若被暂停了 则抛出暂停异常
       else if (Boolean.getBoolean("com.zaxxer.hikari.throwIfSuspended")) {
          throw new SQLTransientException("The pool is currently suspended and configured to throw exceptions upon acquisition");
       }
-
+      //3. 继续进行获取
       acquisitionSemaphore.acquireUninterruptibly();
    }
 

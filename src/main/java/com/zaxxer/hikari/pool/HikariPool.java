@@ -68,7 +68,10 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  *
  * @author Brett Wooldridge
  */
-public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBagStateListener
+public final class HikariPool extends PoolBase implements
+   //暴露JMX接口，可以通过JMX进行动态参数替换
+   HikariPoolMXBean,
+   IBagStateListener
 {
    private final Logger logger = LoggerFactory.getLogger(HikariPool.class);
 
@@ -101,7 +104,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
 
    //ProxyLeakTask的执行器工厂方法
    private final ProxyLeakTaskFactory leakTaskFactory;
-   //作者写的一个锁 基于信号量
+   //作者写的一个锁 基于信号量 用于线程池的暂停和重新启用
    private final SuspendResumeLock suspendResumeLock;
 
 
@@ -194,37 +197,44 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
    //TODO　获取连接并未做并发控制　　通过compareAndSet实现锁粒度的最小化？
    public Connection getConnection(final long hardTimeout) throws SQLException
    {
-
-      //那就什么都不干了，直接放进来，不做suspend--做了一个类似限流的功能
-      //后边的代码允许多线程访问。只不过加了流量的限制
       suspendResumeLock.acquire();
       final long startTime = currentTime();
 
       try {
          long timeout = hardTimeout;
          do {
-            //先借一个PoolEntry
+            //先借一个PoolEntry-timeout超时时间
             PoolEntry poolEntry = connectionBag.borrow(timeout, MILLISECONDS);
-            //如果没有借到 返回异常
+            //如果没有借到 则不再继续 跳出循环
             if (poolEntry == null) {
                break; // We timed out... break and throw exception
             }
 
             final long now = currentTime();
-            //如果借到的Entry为空
+            //如果借到的Entry被标记为清除（另一个线程，无锁结构）
             if (poolEntry.isMarkedEvicted() ||
                //或者 或者空闲时间过长&&已经not alive
                (elapsedMillis(poolEntry.lastAccessed, now) > aliveBypassWindowMs && !isConnectionAlive(poolEntry.connection))) {
+
+               //关闭connection
                closeConnection(poolEntry, poolEntry.isMarkedEvicted() ? EVICTED_CONNECTION_MESSAGE : DEAD_CONNECTION_MESSAGE);
+               //更新timeout
                timeout = hardTimeout - elapsedMillis(startTime);
             }
             else {
                metricsTracker.recordBorrowStats(poolEntry, startTime);
+               //创建代理连接
                return poolEntry.createProxyConnection(leakTaskFactory.schedule(poolEntry), now);
             }
-         } while (timeout > 0L);
+         }
+         //while循环重试
+         while (timeout > 0L);
 
+
+         //metricsTracker metrics记录
          metricsTracker.recordBorrowTimeoutStats(startTime);
+
+         //抛出超时异常
          throw createTimeoutException(startTime);
       }
       catch (InterruptedException e) {
@@ -232,7 +242,6 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
          throw new SQLException(poolName + " - Interrupted during connection acquisition", e);
       }
       finally {
-         //释放锁-》信号量释放许可
          suspendResumeLock.release();
       }
    }
@@ -640,20 +649,26 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
     * through {@link com.zaxxer.hikari.HikariDataSource#evictConnection(Connection)} then {@code owner} is {@code true}.
     *
     * If the caller is the owner, or if the Connection is idle (i.e. can be "reserved" in the {@link ConcurrentBag}),
-    * then we can close the connection immediately.  Otherwise, we leave it "marked" for eviction so that it is evicted
+    * then we can close the connection immediately.
+    * //否则，我们只是标记一下它可以驱逐
+    * //因此，该connection可以被下次获取
+    * Otherwise, we leave it "marked" for eviction so that it is evicted
     * the next time someone tries to acquire it from the pool.
     *
     * @param poolEntry the PoolEntry (/Connection) to "soft" evict from the pool
     * @param reason the reason that the connection is being evicted
+    *
     * @param owner true if the caller is the owner of the connection, false otherwise
+    *              只有在用户直接调用evictConnection时 owner为true
     * @return true if the connection was evicted (closed), false if it was merely marked for eviction
     */
    private boolean softEvictConnection(final PoolEntry poolEntry, final String reason, final boolean owner)
    {
       //entry标记被清理
       poolEntry.markEvicted();
-      //reserve成功
+
       if (owner || connectionBag.reserve(poolEntry)) {
+         //如果是用户主动驱逐 或者 连接是空闲状态
          //关闭连接
          closeConnection(poolEntry, reason);
          return true;

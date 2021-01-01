@@ -134,12 +134,15 @@ abstract class PoolBase
             logger.debug("{} - Closing connection {}: {}", poolName, connection, closureReason);
 
             try {
+               //1. 设置当前连接的超时时间
                setNetworkTimeout(connection, SECONDS.toMillis(15));
             }
             catch (SQLException e) {
                // ignore
             }
             finally {
+               //2. 执行JDBC关闭动作
+               //TODO 为什么要先设置超时时间，然后再执行connection的关闭动作
                connection.close(); // continue with the close even if setNetworkTimeout() throws
             }
          }

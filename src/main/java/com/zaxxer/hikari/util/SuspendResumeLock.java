@@ -29,6 +29,7 @@ import java.util.concurrent.Semaphore;
  */
 public class SuspendResumeLock
 {
+   //TODO　FAUX 模式???
    public static final SuspendResumeLock FAUX_LOCK = new SuspendResumeLock(false) {
       @Override
       public void acquire() {}
@@ -43,6 +44,7 @@ public class SuspendResumeLock
       public void resume() {}
    };
 
+   //声明信号量以及信号量对应的许可
    private static final int MAX_PERMITS = 10000;
    private final Semaphore acquisitionSemaphore;
 

@@ -174,7 +174,7 @@ final class PoolEntry implements IConcurrentBagEntry
       if (eol != null && !eol.isDone() && !eol.cancel(false)) {
          LOGGER.warn("{} - maxLifeTime expiration task cancellation unexpectedly returned false for connection {}", getPoolName(), connection);
       }
-
+      //将connection置为空
       Connection con = connection;
       connection = null;
       endOfLife = null;

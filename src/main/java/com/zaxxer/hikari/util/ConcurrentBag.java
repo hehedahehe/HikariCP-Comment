@@ -205,11 +205,15 @@ public class ConcurrentBag<T extends IConcurrentBagEntry> implements AutoCloseab
       }
 
       sharedList.add(bagEntry);
-
+      //会阻塞
       // spin until a thread takes it or none are waiting
-      //如果有等待者，并且刚好这个bagEntry是空闲的
-      //如果没有传递成功（采用的不等待的机制）
-      while (waiters.get() > 0 && bagEntry.getState() == STATE_NOT_IN_USE && !handoffQueue.offer(bagEntry)) {
+      //如果有等待者，并且刚好这个bagEntry是空闲的,则尝试*直接推送*给消费者
+      //如果没有传递成功（采用的不等待的机制），并且前两个条件依然满足，则loop
+      //同时，为了防止while过多的无效消耗CPU资源，当前线程会*尝试*yield
+      while (waiters.get() > 0 &&
+         //状态会变换（参照状态转换图）
+         bagEntry.getState() == STATE_NOT_IN_USE &&
+         !handoffQueue.offer(bagEntry)) {
          //当前线主动程释放资源
          //TODO 客气一下？？
          Thread.yield();

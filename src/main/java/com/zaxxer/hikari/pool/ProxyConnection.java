@@ -48,7 +48,9 @@ public abstract class ProxyConnection implements Connection
    private static final Logger LOGGER;
    private static final Set<String> ERROR_STATES;
    private static final Set<Integer> ERROR_CODES;
-
+   /**
+    * 实际的连接
+    */
    @SuppressWarnings("WeakerAccess")
    protected Connection delegate;
 
@@ -250,10 +252,12 @@ public abstract class ProxyConnection implements Connection
       closeStatements();
 
       if (delegate != ClosedConnection.CLOSED_CONNECTION) {
+         //关闭任务
          leakTask.cancel();
 
          try {
             if (isCommitStateDirty && !isAutoCommit) {
+               //回滚该连接下的所有Connection
                delegate.rollback();
                lastAccess = currentTime();
                LOGGER.debug("{} - Executed rollback on connection {} due to dirty commit state on close().", poolEntry.getPoolName(), delegate);

@@ -45,7 +45,38 @@ import org.junit.Test;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-/**
+/**java.lang.IllegalStateException:
+ * You need to run the CLI build and you need target/classes in your classpath to run.
+
+ at com.zaxxer.hikari.pool.ProxyFactory.getProxyConnection(ProxyFactory.java:58)
+ at com.zaxxer.hikari.pool.PoolEntry.createProxyConnection(PoolEntry.java:97)
+ at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:227)
+ at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:182)
+ at com.zaxxer.hikari.HikariDataSource.getConnection(HikariDataSource.java:100)
+ at com.zaxxer.hikari.pool.MiscTest.testLeakDetection(MiscTest.java:118)
+ at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+ at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+ at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+ at java.lang.reflect.Method.invoke(Method.java:498)
+ at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+ at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+ at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+ at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+ at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+ at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+ at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+ at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+ at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+ at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+ at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+ at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+ at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+ at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+ at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:69)
+ at com.intellij.rt.junit.IdeaTestRunner$Repeater.startRunnerWithArgs(IdeaTestRunner.java:33)
+ at com.intellij.rt.junit.JUnitStarter.prepareStreamsAndStart(JUnitStarter.java:220)
+ at com.intellij.rt.junit.JUnitStarter.main(JUnitStarter.java:53)
+
  * @author Brett Wooldridge
  */
 public class MiscTest

@@ -31,13 +31,13 @@ import org.slf4j.LoggerFactory;
  */
 class ProxyLeakTask implements Runnable
 {
-   private static final Logger LOGGER = LoggerFactory.getLogger(ProxyLeakTask.class);
+   private  static final Logger LOGGER = LoggerFactory.getLogger(ProxyLeakTask.class);
    static final ProxyLeakTask NO_LEAK;
 
    private ScheduledFuture<?> scheduledFuture;
    private String connectionName;
    private Exception exception;
-   private String threadName; 
+   private String threadName;
    private boolean isLeaked;
 
    static
@@ -56,6 +56,7 @@ class ProxyLeakTask implements Runnable
 
    ProxyLeakTask(final PoolEntry poolEntry)
    {
+      //new一个泄漏异常
       this.exception = new Exception("Apparent connection leak detected");
       this.threadName = Thread.currentThread().getName();
       this.connectionName = poolEntry.connection.toString();
@@ -76,11 +77,12 @@ class ProxyLeakTask implements Runnable
    {
       isLeaked = true;
 
-      final StackTraceElement[] stackTrace = exception.getStackTrace(); 
+      final StackTraceElement[] stackTrace = exception.getStackTrace();
       final StackTraceElement[] trace = new StackTraceElement[stackTrace.length - 5];
       System.arraycopy(stackTrace, 5, trace, 0, trace.length);
 
       exception.setStackTrace(trace);
+      //泄漏异常记录
       LOGGER.warn("Connection leak detection triggered for {} on thread {}, stack trace follows", connectionName, threadName, exception);
    }
 

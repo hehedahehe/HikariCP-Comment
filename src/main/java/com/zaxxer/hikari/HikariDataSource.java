@@ -95,16 +95,17 @@ public class HikariDataSource extends HikariConfig implements DataSource, Closea
       if (isClosed()) {
          throw new SQLException("HikariDataSource " + this + " has been closed.");
       }
-
+      //优先从fastPathPool中获取连接
       if (fastPathPool != null) {
          return fastPathPool.getConnection();
       }
 
       // See http://en.wikipedia.org/wiki/Double-checked_locking#Usage_in_Java
+      // 否则的话，从pool中拿
       HikariPool result = pool;
       if (result == null) {
          synchronized (this) {
-            result = pool;
+            result = pool; //DCL-再次赋值
             if (result == null) {
                validate();
                LOGGER.info("{} - Starting...", getPoolName());
@@ -350,8 +351,11 @@ public class HikariDataSource extends HikariConfig implements DataSource, Closea
             LOGGER.info("{} - Shutdown initiated...", getPoolName());
             p.shutdown();
             LOGGER.info("{} - Shutdown completed.", getPoolName());
-         }
-         catch (InterruptedException e) {
+         } catch (InterruptedException e) {
+            //线程中断的处理
+            //一个线程在未正常结束之前, 被强制终止是很危险的事情.
+            //比如正常逻辑执行到一半，剩余的逻辑还未执行完
+            //因为它可能带来完全预料不到的严重后果比如会带着自己所持有的锁而永远的休眠，迟迟不归还锁等。
             LOGGER.warn("{} - Interrupted during closing", getPoolName(), e);
             Thread.currentThread().interrupt();
          }

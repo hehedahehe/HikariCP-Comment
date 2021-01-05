@@ -56,17 +56,23 @@ import static java.util.concurrent.locks.LockSupport.parkNanos;
  * @author Brett Wooldridge
  */
 public class ConcurrentBag<T extends IConcurrentBagEntry> implements AutoCloseable {
+
    private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentBag.class);
 
+   //数据存储
    private final CopyOnWriteArrayList<T> sharedList;
-   private final boolean weakThreadLocals;
-
+   //生产-消费通信
+   private final SynchronousQueue<T> handoffQueue;
+   //线程缓存
    private final ThreadLocal<List<Object>> threadList;
+   private final boolean weakThreadLocals;
+   //
    private final IBagStateListener listener;
+
+   //状态维护
    private final AtomicInteger waiters;
    private volatile boolean closed;
 
-   private final SynchronousQueue<T> handoffQueue;
 
    public interface IConcurrentBagEntry {
       int STATE_NOT_IN_USE = 0;
@@ -115,19 +121,30 @@ public class ConcurrentBag<T extends IConcurrentBagEntry> implements AutoCloseab
     */
    public T borrow(long timeout, final TimeUnit timeUnit) throws InterruptedException {
       // Try the thread-local list first
+
+      //获取当前线程的缓存
       final List<Object> list = threadList.get();
       for (int i = list.size() - 1; i >= 0; i--) {
+         //从末尾开始
+         //取出Entry
          final Object entry = list.remove(i);
+
+         //类型转换
+         //作者在在设计ThreadLocal内存优化的模式时，给出了WeakReference的可选配置，用于内存优化
          @SuppressWarnings("unchecked") final T bagEntry = weakThreadLocals ? ((WeakReference<T>) entry).get() : (T) entry;
+         //如果缓存命中，并且状态更改成功，则返回该connection
          if (bagEntry != null && bagEntry.compareAndSet(STATE_NOT_IN_USE, STATE_IN_USE)) {
             return bagEntry;
          }
       }
-
+      //如果当前线程缓存没有命中
+      //则当前线程等待 获取
       // Otherwise, scan the shared list ... then poll the handoff queue
       final int waiting = waiters.incrementAndGet();
       try {
+         //获取 遍历sharedList
          for (T bagEntry : sharedList) {
+            //如果更改状态成功 则返回之 获取成功
             if (bagEntry.compareAndSet(STATE_NOT_IN_USE, STATE_IN_USE)) {
                // If we may have stolen another waiter's connection, request another bag add.
                if (waiting > 1) {
@@ -136,9 +153,10 @@ public class ConcurrentBag<T extends IConcurrentBagEntry> implements AutoCloseab
                return bagEntry;
             }
          }
-
+         //如果没有获取到，通过用户回调告知用户
          listener.addBagItem(waiting);
 
+         //则轮询 从handoffQueue中
          timeout = timeUnit.toNanos(timeout);
          do {
             final long start = currentTime();
@@ -148,6 +166,7 @@ public class ConcurrentBag<T extends IConcurrentBagEntry> implements AutoCloseab
             }
 
             timeout -= elapsedNanos(start);
+            //这个大于10s是什么意思？
          } while (timeout > 10_000);
 
          return null;
@@ -179,9 +198,12 @@ public class ConcurrentBag<T extends IConcurrentBagEntry> implements AutoCloseab
             //(i & 0xff) == 0xff 这个是什么意思？
             //每迭代256次，就进入10微秒的睡眠
          } else if ((i & 0xff) == 0xff) {
-            //当前线程暂停
+            //当前线程暂停，停止调度
+            //Disables the current thread for thread scheduling purposes, for up to
+            //the specified waiting time, unless the permit is available.
             parkNanos(MICROSECONDS.toNanos(10));
          } else {
+            //礼让以下
             Thread.yield();
          }
       }

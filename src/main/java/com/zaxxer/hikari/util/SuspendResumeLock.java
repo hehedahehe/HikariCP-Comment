@@ -78,7 +78,7 @@ public class SuspendResumeLock
    {
       acquisitionSemaphore.release();
    }
-
+   //suspend期间 会阻止acquire,因为suspend拿走了所有的许可
    public void suspend()
    {
       acquisitionSemaphore.acquireUninterruptibly(MAX_PERMITS);

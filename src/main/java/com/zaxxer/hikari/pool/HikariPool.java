@@ -189,14 +189,19 @@ public final class HikariPool extends PoolBase implements
     * @return a java.sql.Connection instance
     * @throws SQLException thrown if a timeout occurs trying to obtain a connection
     */
-   //TODO　获取连接并未做并发控制　　通过compareAndSet实现锁粒度的最小化？
-   public Connection getConnection(final long hardTimeout) throws SQLException {
+   //获取连接并未做并发控制　　通过单个元素的状态位的 compareAndSet实现锁粒度的最小化？
+   public Connection getConnection(final long hardTimeout) throws SQLException
+   {
       suspendResumeLock.acquire();
       final long startTime = currentTime();
 
       try {
          long timeout = hardTimeout;
          do {
+            //获取连接的并发控制放在了ConnectionBag并发容器进行，容器通过存储和通信分离的机制显现了生产-消费者模型
+            //SynQueue的机制从　　通过compareAndSet实现锁粒度的最小化？
+            //理论上效率比BlockQueue效率要高
+
             //先借一个PoolEntry-timeout超时时间
             PoolEntry poolEntry = connectionBag.borrow(timeout, MILLISECONDS);
             //如果没有借到 则不再继续 跳出循环
